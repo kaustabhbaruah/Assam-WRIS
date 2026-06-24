@@ -1,0 +1,6 @@
+{
+  "name": "AssamWRIS",
+  "description": "Integrated Water Resources Information System for the Government of Assam, featuring GIS exploration, telemetry monitoring, and resource management.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API", "GIS", "Data Visualization", "Real-time Monitoring"]
+}

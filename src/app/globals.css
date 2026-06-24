@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Public+Sans:wght@600;700&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Configure Tailwind v4 to respect the .dark class on the html element */
+@variant dark (&:is(.dark, .dark *));
+
+/**
+ * Global Theme Configuration
+ * Extends Tailwind CSS with the AssamWRIS brand identity
+ */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Public Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* AssamWRIS Color Palette - Defined for consistency across the application */
+  --color-primary-blue: #00376c;
+  --color-aquatic-teal: #006970;
+  --color-surface-bright: #f8f9ff;
+  --color-surface-container: #e5eeff;
+  --color-on-surface: #121c28;
+  --color-on-surface-variant: #424751;
+  --color-primary-container: #074e92;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+}
+
+@layer base {
+  body {
+    /* Sets the default background and text colors to match the government style guide */
+    @apply bg-surface-bright text-on-surface font-sans transition-colors duration-300;
+  }
+  
+  html.dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
+
+  h1, h2, h3, h4 {
+    /* Primary headings use a bolder, more authoritative font */
+    @apply font-headline tracking-tight;
+  }
+}
+
+/**
+ * Custom Map Viewport
+ * Provides a placeholder background for the GIS explorer when map data isn't fully loaded
+ */
+.map-viewport {
+  background-image: linear-gradient(rgba(248, 249, 255, 0.4), rgba(248, 249, 255, 0.4)), url(https://lh3.googleusercontent.com/aida-public/AB6AXuDSBwBv1NqEnW60CiE_g_hX6krCh0i6N3fndZlq_Anm80mOC1qD53qCIhBLMOmWJ9lHCWVPRkHHHCMbfiopAxLCbNyD1DM88wywDC7ZTKDDcUwIsSdottcYRKWGMMM4TXNvHbXyQ3TGBEbRD0ukV224WYAgogtKISuwWGPRuUKKkCbmO-y4uSNzr_xsyES_eov1CcC-bi8jgOvy4lAKhFRq3wsJpusX5IebVQQNMGpOQzlX_o_6YSawJ_ZgusP49sFCwQIngiyBKMk);
+  background-size: cover;
+  background-position: center;
+}
+
+/**
+ * Minimalist Scrollbar Design
+ */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}

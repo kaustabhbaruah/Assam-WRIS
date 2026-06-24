@@ -1,0 +1,5 @@
+{
+  "/api/geoserver/wms/route": "app/api/geoserver/wms/route.js",
+  "/explorer/page": "app/explorer/page.js",
+  "/page": "app/page.js"
+}
