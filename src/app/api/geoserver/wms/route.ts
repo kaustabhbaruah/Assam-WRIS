@@ -55,9 +55,7 @@ export async function GET(req: NextRequest) {
     const params = new URLSearchParams();
     searchParams.forEach((val, key) => {
       const upperKey = key.toUpperCase();
-      if (upperKey === "LAYERS") {
-        params.set(key, formatLayersArray(val));
-      } else if (upperKey === "QUERY_LAYERS") {
+      if (upperKey === "LAYERS" || upperKey === "LAYER" || upperKey === "QUERY_LAYERS") {
         params.set(key, formatLayersArray(val));
       } else {
         params.set(key, val);

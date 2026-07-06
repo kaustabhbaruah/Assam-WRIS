@@ -1,5 +1,6 @@
 {
-  "/api/geoserver/wms/route": "app/api/geoserver/wms/route.js",
+  "/api/geoserver/download/route": "app/api/geoserver/download/route.js",
+  "/page": "app/page.js",
   "/explorer/page": "app/explorer/page.js",
-  "/page": "app/page.js"
+  "/catalog/page": "app/catalog/page.js"
 }

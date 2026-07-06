@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "ol/ol.css";
 import Map from "ol/Map";
 import View from "ol/View";
@@ -14,12 +14,7 @@ import BaseLayer from "ol/layer/Base";
 import TileWMS from "ol/source/TileWMS";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
-import Feature from "ol/Feature";
-import Point from "ol/geom/Point";
-import LineString from "ol/geom/LineString";
-import Polygon from "ol/geom/Polygon";
-import { Style, Circle as CircleStyle, Fill, Stroke } from "ol/style";
-// import { Filter, Check, RotateCcw, ChevronDown, Database, Eye } from "lucide-react";
+import { Style, Fill, Stroke } from "ol/style";
 import { Filter, Check, RotateCcw, ChevronDown, Database, Eye, Layers, Compass, MapPin } from "lucide-react";
 
 
@@ -52,12 +47,6 @@ interface MapComponentProps {
   [key: string]: any; // Allows custom user integrations dynamically (like isCgwbVisible) without causing fatal compilation errors
 }
 
-// Dynamic configuration parameters for personal or remote GeoServer connections
-const GEOSERVER_URL = process.env.NEXT_PUBLIC_GEOSERVER_URL || "http://localhost:8080/geoserver";
-const GEOSERVER_WORKSPACE = process.env.NEXT_PUBLIC_GEOSERVER_WORKSPACE || "assam";
-const GEOSERVER_USER = process.env.NEXT_PUBLIC_GEOSERVER_USER || "";
-const GEOSERVER_PASSWORD = process.env.NEXT_PUBLIC_GEOSERVER_PASSWORD || "";
-
 // Cache for converted Hex to RGBA strings to avoid parsing overhead
 const rgbaCache: Record<string, string> = {};
 
@@ -74,89 +63,6 @@ function convertHexToRgba(hex: string, alpha: number) {
   rgbaCache[cacheKey] = result;
   return result;
 }
-
-// Global cache for OpenLayers Style objects to prevent heavy re-allocation and GC pressure on every frame
-const styleCache: Record<string, Style> = {};
-
-// Generates small point & thin polygon outlines
-const getStyleForLayer = (layerId: string, isHighlighted: boolean = false, feature?: any) => {
-  // Determine geometry type to retrieve matching styles from cache
-  let geomType = "Polygon";
-  if (feature) {
-    const geom = feature.getGeometry();
-    if (geom) {
-      geomType = geom.getType();
-    }
-  }
-
-  // Handle high-performance reusable vector styles for overlays (selection, hover, drawing)
-  const styleKey = `${layerId}_${geomType}_${isHighlighted ? 'highlight' : 'normal'}`;
-  if (styleCache[styleKey]) {
-    return styleCache[styleKey];
-  }
-
-  let styleInstance: Style;
-
-  if (isHighlighted) {
-    if (geomType === "Point" || geomType === "MultiPoint") {
-      styleInstance = new Style({
-        image: new CircleStyle({
-          radius: 7,
-          fill: new Fill({ color: "#f59e0b" }), // Highlight color: Amber
-          stroke: new Stroke({ color: "#ffffff", width: 2 }),
-        }),
-      });
-    } else if (geomType === "LineString" || geomType === "MultiLineString") {
-      styleInstance = new Style({
-        stroke: new Stroke({
-          color: "#f59e0b",
-          width: 3.5,
-        }),
-      });
-    } else {
-      styleInstance = new Style({
-        stroke: new Stroke({
-          color: "#ffffff",
-          width: 2.5,
-        }),
-        fill: new Fill({
-          color: convertHexToRgba("#f59e0b", 0.55),
-        }),
-      });
-    }
-  } else {
-    // Normal / Unhighlighted styles matching geometry (subtle, transparent fallback)
-    if (geomType === "Point" || geomType === "MultiPoint") {
-      styleInstance = new Style({
-        image: new CircleStyle({
-          radius: 4,
-          fill: new Fill({ color: "rgba(100, 116, 139, 0.4)" }),
-          stroke: new Stroke({ color: "rgba(255, 255, 255, 0.5)", width: 1 }),
-        }),
-      });
-    } else if (geomType === "LineString" || geomType === "MultiLineString") {
-      styleInstance = new Style({
-        stroke: new Stroke({
-          color: "rgba(100, 116, 139, 0.4)",
-          width: 1.5,
-        }),
-      });
-    } else {
-      styleInstance = new Style({
-        stroke: new Stroke({
-          color: "rgba(100, 116, 139, 0.4)",
-          width: 1,
-        }),
-        fill: new Fill({
-          color: "rgba(100, 116, 139, 0.08)",
-        }),
-      });
-    }
-  }
-
-  styleCache[styleKey] = styleInstance;
-  return styleInstance;
-};
 
 
 const getBasemapSource = (type: "osm" | "satellite" | "light" | "dark") => {
@@ -219,97 +125,9 @@ export default function MapComponent({
   const mapElement = useRef<HTMLDivElement>(null);
   const popupElement = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
-  // Active fetch abort controllers to support request cancellation during zoom/pan
-  const activeControllersRef = useRef<Record<string, AbortController>>({});
 
   // Monitor layers with connection errors (e.g., local GeoServer port 8080 unreachable inside high-security cloud runner preview)
   const [geoServerErrors, setGeoServerErrors] = useState<string[]>([]);
-
-  // Creates a robust WFS vector source through the secure relative Next.js API Proxy
-  const createGeoServerVectorSource = (layerName: string) => {
-    return new VectorSource({
-      format: new GeoJSON(),
-      loader: function (extent, resolution, projection, success, failure) {
-        // Zoom-dependent visibility and load optimization (Resolution is in projection meters/pixel)
-        // High resolution = zoomed out. Low resolution = zoomed in.
-        const heavyLayers: Record<string, number> = {
-          lulc: 160,           // load only at zoom >= 10
-          soil_texture: 310,   // load only at zoom >= 9
-          waterbodies_amrut: 310, // load only at zoom >= 9
-          pwd_landmark: 160,   // load only at zoom >= 10
-          ward_boundary: 310,  // load only at zoom >= 9
-        };
-
-        if (heavyLayers[layerName] && resolution > heavyLayers[layerName]) {
-          // Zoomed out too far for heavy layers – don't fetch from network, clear current features to reclaim memory
-          this.clear(true);
-          if (success) success([]);
-          return;
-        }
-
-        // If there is an ongoing fetch request for this exact layer, cancel it to avoid concurrent request queueing
-        if (activeControllersRef.current[layerName]) {
-          try {
-            activeControllersRef.current[layerName].abort();
-          } catch (_) {}
-        }
-
-        const controller = new AbortController();
-        activeControllersRef.current[layerName] = controller;
-
-        // Query the relative Next.js Server-Side API proxy to avoid browser Mixed Content (HTTPS -> HTTP) and Origin CORS blocks
-        const url = `/api/geoserver?layer=${layerName}&bbox=${extent.join(",")}`;
-
-        fetch(url, { signal: controller.signal })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`Proxy-to-GeoServer communication error (Status: ${response.status})`);
-            }
-            return response.json();
-          })
-          .then((data) => {
-            if (activeControllersRef.current[layerName] === controller) {
-              delete activeControllersRef.current[layerName];
-            }
-            const features = new GeoJSON().readFeatures(data);
-            
-            features.forEach((f) => {
-              f.set("layer_id", layerName);
-            });
-
-            // Feature load succeeded, clear any pre-existing connection errors for this layer
-            setGeoServerErrors((prev) => prev.filter((name) => name !== layerName));
-
-            // Clear old features to prevent high browser memory consumption on map panning
-            this.clear(true);
-
-            this.addFeatures(features);
-            if (success) success(features);
-          })
-          .catch((err) => {
-            if (err.name === "AbortError") {
-              // Ignore expected abort errors
-              return;
-            }
-            if (activeControllersRef.current[layerName] === controller) {
-              delete activeControllersRef.current[layerName];
-            }
-            console.warn(`GIS Info: GeoServer connection failed or layer 404 on [${layerName}]: ${err.message}`);
-            
-            // Log connection error to display in the UI Status badge
-            setGeoServerErrors((prev) => {
-              if (!prev.includes(layerName)) {
-                return [...prev, layerName];
-              }
-              return prev;
-            });
-
-            if (failure) failure();
-          });
-      },
-      strategy: (extent) => [extent],
-    });
-  };
 
   // Layer references (Supports both VectorLayer and TileLayer/WMS dynamically)
   const layerRefs = useRef<Record<string, BaseLayer | null>>({
@@ -343,10 +161,6 @@ export default function MapComponent({
   // Native WMS GetFeatureInfo click highlight overlay source and layer
   const highlightSourceRef = useRef<VectorSource | null>(null);
 
-  // Performance Instrumentation states (TASK 9)
-  const [wmsResponseTime, setWmsResponseTime] = useState<number | null>(null);
-  const [lastLayerLoadTime, setLastLayerLoadTime] = useState<number | null>(null);
-
   // Client-side React Filter States
   const [activeFilterField, setActiveFilterField] = useState<string>("");
   const [activeFilterValue, setActiveFilterValue] = useState<string>("");
@@ -362,8 +176,6 @@ export default function MapComponent({
   const [uniqueValues, setUniqueValues] = useState<string[]>([]);
   const [currentScale, setCurrentScale] = useState<number>(0);
   const [hoverCoords, setHoverCoords] = useState<{ lat: number; lon: number } | null>(null);
-  
-  const [counts, setCounts] = useState({ totalBeforeFilter: 0, visibleAfterFilter: 0 });
 
   // Props synchronization Ref
   const visibilityPropsRef = useRef({
@@ -485,7 +297,7 @@ export default function MapComponent({
         ],
         view: new View({
           center: fromLonLat([92.9376, 26.2006]),
-          zoom: 8,
+          zoom: 7.8,
         }),
       });
 
@@ -541,172 +353,112 @@ export default function MapComponent({
         popupElement.current!.style.display = "block";
       };
 
-      // Unified vector/WMS single-click interaction and centering
+      // Unified single-click GetFeatureInfo interaction and centering
       initialMap.on("singleclick", async (evt) => {
         const coordinate = evt.coordinate;
         const view = initialMap!.getView();
         
-        // Clear previous selected highlights on all visible vector layers
-        initialMap!.getLayers().forEach((l) => {
-          if (l instanceof VectorLayer) {
-            const src = l.getSource();
-            if (src) {
-              src.getFeatures().forEach((f: any) => {
-                if (typeof f.get === "function" && f.get("selected")) {
-                  f.unset("selected");
-                  f.changed();
-                }
-              });
-            }
-          }
-        });
-
         // Reset temporary highlight vector polygon
         if (highlightSourceRef.current) {
           highlightSourceRef.current.clear();
         }
 
-        let foundFeature = false;
+        const visibleWmsLayers = Object.entries(visibilityPropsRef.current)
+          .filter(([id, isVisible]) => isVisible)
+          .map(([id]) => id);
 
-        // 1. First, query any active browser-side vector features (Category B)
-        initialMap!.forEachFeatureAtPixel(evt.pixel, (feature) => {
-          if (foundFeature) return;
-          const f = feature as any;
-          const layerId = f.get("layer_id") || "default";
+        if (visibleWmsLayers.length > 0) {
+          // Sort layers so background boundaries are queried last, and thematic overlays are queried first
+          const layerPriority: Record<string, number> = {
+            state_boundary: 1,
+            district_boundary: 2,
+            ward_boundary: 3,
+            revenue_circle: 4,
+            soil_texture: 10,
+            lulc: 11,
+            reserve_forests: 12,
+            protected_areas: 13,
+            wetland: 14,
+            waterbodies_amrut: 15,
+            basin_boundary: 16,
+            river_network: 17,
+            embankment: 18,
+            pwd_landmark: 30,
+            bridge_points: 31,
+            rtdas: 32,
+            nhp_rtdas: 33,
+            cgwb_data: 34,
+            sluice_gates: 35,
+            flood_layer_2024: 50,
+            flood_layer_2023: 50,
+            flood_layer_2022: 50,
+            flood_layer_2021: 50,
+            flood_layer_2020: 50,
+          };
 
-          if (layerId === "wms_highlight") return;
+          visibleWmsLayers.sort((a, b) => {
+            const prioA = layerPriority[a] || 5;
+            const prioB = layerPriority[b] || 5;
+            return prioA - prioB;
+          });
 
-          // Mark as selected to activate vector selection style
-          if (typeof f.set === "function") {
-            f.set("selected", true);
-            f.changed();
-          }
-          foundFeature = true;
+          // Select foremost visible layer (overlay priority)
+          const targetId = visibleWmsLayers[visibleWmsLayers.length - 1];
+          const size = initialMap!.getSize();
+          const extent = view.calculateExtent();
 
-          let targetCoordinate = coordinate;
-          const geom = f.getGeometry();
-          if (geom) {
-            const geomType = geom.getType();
-            if (geomType === "Point") {
-              targetCoordinate = (geom as Point).getCoordinates();
-            } else {
-              const extent = geom.getExtent();
-              targetCoordinate = [
-                (extent[0] + extent[2]) / 2,
-                (extent[1] + extent[3]) / 2
-              ];
-            }
-          }
+          const queryUrl = `/api/geoserver/wms` +
+            `?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo` +
+            `&LAYERS=${targetId}` +
+            `&QUERY_LAYERS=${targetId}` +
+            `&INFO_FORMAT=application/json` +
+            `&X=${Math.round(evt.pixel[0])}` +
+            `&Y=${Math.round(evt.pixel[1])}` +
+            `&WIDTH=${Math.round(size![0])}` +
+            `&HEIGHT=${Math.round(size![1])}` +
+            `&BBOX=${extent.join(",")}` +
+            `&SRS=EPSG:3857`;
 
-          renderPopup(f.getProperties(), layerId, targetCoordinate, view, overlay!);
-        });
+          try {
+            const response = await fetch(queryUrl);
 
-        // 2. Query active server-side WMS layers (GetFeatureInfo with smart overlay prioritization)
-        if (!foundFeature) {
-          const visibleWmsLayers = Object.entries(visibilityPropsRef.current)
-            .filter(([id, isVisible]) => isVisible)
-            .map(([id]) => id);
+            if (response.ok) {
+              const geojson = await response.json();
+              if (geojson && geojson.features && geojson.features.length > 0) {
+                const rawFeature = geojson.features[0];
+                const olFeatures = new GeoJSON().readFeatures(geojson);
 
-          if (visibleWmsLayers.length > 0) {
-            // Sort layers so background boundaries are queried last, and thematic overlays are queried first
-            const layerPriority: Record<string, number> = {
-              state_boundary: 1,
-              district_boundary: 2,
-              ward_boundary: 3,
-              revenue_circle: 4,
-              soil_texture: 10,
-              lulc: 11,
-              reserve_forests: 12,
-              protected_areas: 13,
-              wetland: 14,
-              waterbodies_amrut: 15,
-              basin_boundary: 16,
-              river_network: 17,
-              embankment: 18,
-              pwd_landmark: 30,
-              bridge_points: 31,
-              rtdas: 32,
-              nhp_rtdas: 33,
-              cgwb_data: 34,
-              sluice_gates: 35,
-              flood_layer_2024: 50,
-              flood_layer_2023: 50,
-              flood_layer_2022: 50,
-              flood_layer_2021: 50,
-              flood_layer_2020: 50,
-            };
+                if (olFeatures.length > 0) {
+                  const clickedFeature = olFeatures[0];
+                  clickedFeature.set("layer_id", "wms_highlight");
 
-            visibleWmsLayers.sort((a, b) => {
-              const prioA = layerPriority[a] || 5;
-              const prioB = layerPriority[b] || 5;
-              return prioA - prioB;
-            });
-
-            // Select foremost visible layer (overlay priority)
-            const targetId = visibleWmsLayers[visibleWmsLayers.length - 1];
-            const size = initialMap!.getSize();
-            const extent = view.calculateExtent();
-
-            // Store request start performance counter (TASK 9)
-            const queryStartTime = performance.now();
-
-            const queryUrl = `/api/geoserver/wms` +
-              `?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo` +
-              `&LAYERS=${targetId}` +
-              `&QUERY_LAYERS=${targetId}` +
-              `&INFO_FORMAT=application/json` +
-              `&X=${Math.round(evt.pixel[0])}` +
-              `&Y=${Math.round(evt.pixel[1])}` +
-              `&WIDTH=${Math.round(size![0])}` +
-              `&HEIGHT=${Math.round(size![1])}` +
-              `&BBOX=${extent.join(",")}` +
-              `&SRS=EPSG:3857`;
-
-            try {
-              const response = await fetch(queryUrl);
-              const queryEndTime = performance.now();
-              setWmsResponseTime(queryEndTime - queryStartTime); // Log response time count
-
-              if (response.ok) {
-                const geojson = await response.json();
-                if (geojson && geojson.features && geojson.features.length > 0) {
-                  const rawFeature = geojson.features[0];
-                  const olFeatures = new GeoJSON().readFeatures(geojson);
-
-                  if (olFeatures.length > 0) {
-                    const clickedFeature = olFeatures[0];
-                    clickedFeature.set("layer_id", "wms_highlight");
-
-                    if (highlightSourceRef.current) {
-                      highlightSourceRef.current.addFeature(clickedFeature);
-                    }
-
-                    let targetCoordinate = coordinate;
-                    const geom = clickedFeature.getGeometry();
-                    if (geom) {
-                      const extent = geom.getExtent();
-                      targetCoordinate = [
-                        (extent[0] + extent[2]) / 2,
-                        (extent[1] + extent[3]) / 2
-                      ];
-                    }
-
-                    renderPopup(rawFeature.properties, targetId, targetCoordinate, view, overlay!);
-                    foundFeature = true;
+                  if (highlightSourceRef.current) {
+                    highlightSourceRef.current.addFeature(clickedFeature);
                   }
+
+                  let targetCoordinate = coordinate;
+                  const geom = clickedFeature.getGeometry();
+                  if (geom) {
+                    const extent = geom.getExtent();
+                    targetCoordinate = [
+                      (extent[0] + extent[2]) / 2,
+                      (extent[1] + extent[3]) / 2
+                    ];
+                  }
+
+                  renderPopup(rawFeature.properties, targetId, targetCoordinate, view, overlay!);
+                  return; // Succeeded, exit click handler
                 }
               }
-            } catch (err) {
-              console.warn("WMS GetFeatureInfo execution failed: ", err);
             }
+          } catch (err) {
+            console.warn("WMS GetFeatureInfo execution failed: ", err);
           }
         }
 
         // Hide overlay if clicking non-feature area
-        if (!foundFeature) {
-          overlay?.setPosition(undefined);
-          if (popupElement.current) popupElement.current.style.display = "none";
-        }
+        overlay?.setPosition(undefined);
+        if (popupElement.current) popupElement.current.style.display = "none";
       });
 
       // Track pointer move to show live hover coordinates in lat/lon
@@ -771,68 +523,31 @@ export default function MapComponent({
     const syncMapLayer = (
       layerKey: string, 
       isVisible: boolean, 
-      layerType: "wms" | "vector",
+      layerType?: "wms" | "vector",
       minZoom?: number,
       maxZoom?: number
     ) => {
       const activeLayers = map.getLayers().getArray();
       let layer = layerRefs.current[layerKey];
 
-      const styleFunc = (feature: any) => {
-        // Vector Client filtering active
-        if (activeFilterField && activeFilterValue) {
-          const val = feature.get(activeFilterField);
-          if (val === undefined || String(val) !== activeFilterValue) {
-            return undefined; // Return undefined to completely hide unmatched features
-          }
-          // Highlight the matched features
-          return getStyleForLayer(layerKey, true, feature);
-        }
-        // Direct map point selection highlight active
-        if (feature.get("selected")) {
-          return getStyleForLayer(layerKey, true, feature);
-        }
-        return getStyleForLayer(layerKey, false, feature);
-      };
-
       if (isVisible) {
         if (!layer) {
-          const startTime = performance.now();
-          if (layerType === "wms") {
-            // WMS layer initialized
-            layer = new TileLayer({
-              source: new TileWMS({
-                url: "/api/geoserver/wms",
-                params: {
-                  "LAYERS": layerKey,
-                  "TILED": true,
-                  "VERSION": "1.1.1",
-                },
-                serverType: "geoserver",
-                crossOrigin: "anonymous"
-              }),
-              properties: { id: layerKey },
-              minZoom: minZoom,
-              maxZoom: maxZoom
-            });
-          } else {
-            // Vector layer initialized
-            layer = new VectorLayer({
-              source: createGeoServerVectorSource(layerKey),
-              style: styleFunc,
-              properties: { id: layerKey },
-              minZoom: minZoom,
-              maxZoom: maxZoom
-            });
-          }
+          layer = new TileLayer({
+            source: new TileWMS({
+              url: "/api/geoserver/wms",
+              params: {
+                "LAYERS": layerKey,
+                "TILED": true,
+                "VERSION": "1.1.1",
+              },
+              serverType: "geoserver",
+              crossOrigin: "anonymous"
+            }),
+            properties: { id: layerKey },
+            minZoom: minZoom,
+            maxZoom: maxZoom
+          });
           layerRefs.current[layerKey] = layer;
-          const endTime = performance.now();
-          setLastLayerLoadTime(endTime - startTime); // Track layer cold initialization lag
-        } else {
-          // Dynamic style updates for live vector filtering rules
-          if (layer instanceof VectorLayer) {
-            layer.setStyle(styleFunc);
-          }
         }
         
         if (!activeLayers.includes(layer)) {
@@ -879,7 +594,7 @@ export default function MapComponent({
     syncMapLayer("reserve_forests", isReserveForestsVisible, "wms");
     
     // PWD Landmark (WMS Layer - obtaining styling from GeoServer)
-    syncMapLayer("pwd_landmark", isPwdLandmarkVisible, "wms", 10);
+    syncMapLayer("pwd_landmark", isPwdLandmarkVisible, "wms");
 
     // Protected Areas (Category A WMS Layer)
     syncMapLayer("protected_areas", isProtectedAreasVisible, "wms");
@@ -907,32 +622,10 @@ export default function MapComponent({
 
     // 13. Flood Inundation Years (Category A WMS Layer, Year specific)
     const floodYears = ["2024", "2023", "2022", "2021", "2020"];
-    console.log(`[Diagnostic] Flood Layer Status - isFloodLayersVisible: ${isFloodLayersVisible}, selectedFloodYear: ${selectedFloodYear}`);
     
-    // Print comprehensive diagnostics for every flood layer (Phase 5 GeoServer Extent & Zoom validation)
     floodYears.forEach((yr) => {
       const resolvedLayerKey = `flood_layer_${yr}`;
       const isVisible = !!isFloodLayersVisible && (selectedFloodYear === yr);
-      
-      console.log(`[Diagnostic] --- FLOOD LAYER CONFIGURATION AUDIT: ${resolvedLayerKey} ---`);
-      console.log(`[Diagnostic] Layer Name: ${resolvedLayerKey}`);
-      console.log(`[Diagnostic] Source Type: TileWMS (OpenLayers)`);
-      console.log(`[Diagnostic] TileWMS URL: /api/geoserver/wms`);
-      console.log(`[Diagnostic] Workspace: ${GEOSERVER_WORKSPACE}`);
-      console.log(`[Diagnostic] Extent: Default OpenLayers View Bounds (Assam envelope matching EPSG:3857)`);
-      console.log(`[Diagnostic] Projection: EPSG:3857 (Web Mercator)`);
-      console.log(`[Diagnostic] Visibility Constraints: None (Fully delegated to authoritative GeoServer scale SLD)`);
-      console.log(`[Diagnostic] Min Zoom: Undefined (Unconstrained)`);
-      console.log(`[Diagnostic] Max Zoom: Undefined (Unconstrained)`);
-      console.log(`[Diagnostic] Active State: ${isVisible ? "VISIBLE (ACTIVE ON MAP)" : "HIDDEN"}`);
-      console.log(`[Diagnostic] WMS Parameter Symmetries (Comparing to flood_layer_2023):`);
-      console.log(`[Diagnostic]   - URL: /api/geoserver/wms (IDENTICAL)`);
-      console.log(`[Diagnostic]   - TILED: true (IDENTICAL)`);
-      console.log(`[Diagnostic]   - VERSION: 1.1.1 (IDENTICAL)`);
-      console.log(`[Diagnostic]   - Server Type: geoserver (IDENTICAL)`);
-      console.log(`[Diagnostic]   - Cross Origin: anonymous (IDENTICAL)`);
-      console.log(`[Diagnostic] ----------------------------------------------------`);
-
       syncMapLayer(resolvedLayerKey, isVisible, "wms");
     });
 
@@ -940,111 +633,24 @@ export default function MapComponent({
     isStateBoundaryVisible, isDistrictBoundaryVisible, isCGWBLayerVisible, isRiverNetworkVisible, isWetlandVisible, isWaterbodiesAmrutVisible,isWardBoundaryVisible, isStateHighwayVisible, isSoilTextureVisible,isRevenueCircleVisible, isReserveForestsVisible, isProtectedAreasVisible, isPwdLandmarkVisible, isBridgePointsVisible, isRtdasVisible, isNhpRtdasVisible, isEmbankmentVisible, isSluiceGatesVisible,isBasinBoundaryVisible, isLULCLayerVisible, activeFilterField, activeFilterValue, selectedFloodYear, isFloodLayersVisible
   ]);
 
-  // Sync features list, available fields, unique values and matching counters
+  // Initialize filter options on mount
   useEffect(() => {
-    let total = 0;
-    let visible = 0;
-    const fieldsSet = new Set<string>();
-    const valuesSet = new Set<string>();
-
-    const activeLayers = [
-      { layer: layerRefs.current.state_boundary, isVisible: isStateBoundaryVisible },
-      { layer: layerRefs.current.district_boundary, isVisible: isDistrictBoundaryVisible },
-      { layer: layerRefs.current.cgwb_data, isVisible: isCGWBLayerVisible },
-      { layer: layerRefs.current.river_network, isVisible: isRiverNetworkVisible },
-      { layer: layerRefs.current.wetland, isVisible: isWetlandVisible },
-      { layer: layerRefs.current.waterbodies_amrut, isVisible: isWaterbodiesAmrutVisible },
-      { layer: layerRefs.current.ward_boundary, isVisible: isWardBoundaryVisible },
-      { layer: layerRefs.current.state_highway, isVisible: isStateHighwayVisible },
-      { layer: layerRefs.current.soil_texture, isVisible: !!isSoilTextureVisible },
-      { layer: layerRefs.current.revenue_circle, isVisible: isRevenueCircleVisible },
-      { layer: layerRefs.current.reserve_forests, isVisible: isReserveForestsVisible },
-      { layer: layerRefs.current.protected_areas, isVisible: isProtectedAreasVisible },
-      { layer: layerRefs.current.pwd_landmark, isVisible: isPwdLandmarkVisible },
-      { layer: layerRefs.current.bridge_points, isVisible: isBridgePointsVisible },
-      { layer: layerRefs.current.rtdas, isVisible: isRtdasVisible },
-      { layer: layerRefs.current.nhp_rtdas, isVisible: isNhpRtdasVisible }, 
-      { layer: layerRefs.current.embankment, isVisible: isEmbankmentVisible },
-      { layer: layerRefs.current.sluice_gates, isVisible: isSluiceGatesVisible },
-      { layer: layerRefs.current.basin_boundary, isVisible: isBasinBoundaryVisible },
-      { layer: layerRefs.current.lulc, isVisible: isLULCLayerVisible },
-      ...["2024", "2023", "2022", "2021", "2020"].map(yr => ({
-        layer: layerRefs.current[`flood_layer_${yr}`],
-        isVisible: !!isFloodLayersVisible && selectedFloodYear === yr
-      }))
-    ];
-
-    activeLayers.forEach(({ layer, isVisible }) => {
-      if (layer && isVisible && mapInstanceRef.current) {
-        const source = (layer as any).getSource ? (layer as any).getSource() : null;
-        const features = (source && typeof (source as any).getFeatures === "function") 
-          ? (source as any).getFeatures() 
-          : [];
-        total += features.length;
-
-        features.forEach(f => {
-          const props = f.getProperties();
-          Object.keys(props).forEach(key => {
-            if (key !== "geometry" && key !== "boundedBy" && key !== "bbox" && key !== "layer_id") {
-              fieldsSet.add(key);
-            }
-          });
-
-          // Test filter match
-          let matched = true;
-          if (activeFilterField && activeFilterValue) {
-            const val = f.get(activeFilterField);
-            if (val === undefined || String(val) !== activeFilterValue) {
-              matched = false;
-            }
-          }
-          if (matched) {
-            visible++;
-          }
-
-          // Fetch unique parameters for dropdown
-          if (activeFilterField) {
-            const val = f.get(activeFilterField);
-            if (val !== undefined && val !== null && val !== "") {
-              valuesSet.add(String(val));
-            }
-          }
-        });
-      }
-    });
-
-    setAvailableFields(Array.from(fieldsSet).sort());
-    setUniqueValues(Array.from(valuesSet).sort());
-    setCounts({ totalBeforeFilter: total, visibleAfterFilter: visible });
-
-    // Trigger layer redraw
-    activeLayers.forEach(({ layer }) => {
-      layer?.changed();
-    });
-  }, [
-    isStateBoundaryVisible, isDistrictBoundaryVisible, isCGWBLayerVisible, isRiverNetworkVisible, isWetlandVisible, isWaterbodiesAmrutVisible,isWardBoundaryVisible, isStateHighwayVisible, isSoilTextureVisible,isRevenueCircleVisible, isReserveForestsVisible, isProtectedAreasVisible, isPwdLandmarkVisible, isBridgePointsVisible, isEmbankmentVisible, isSluiceGatesVisible, isBasinBoundaryVisible, isRtdasVisible, isNhpRtdasVisible, isFloodLayersVisible, selectedFloodYear, activeFilterField, activeFilterValue, isLULCLayerVisible
-  ]);
- // Synchronous features load listener
-  useEffect(() => {
-    const triggerRedraw = () => {
-      Object.values(layerRefs.current).forEach(layer => {
-        layer?.changed();
-      });
-    };
-
-    const sources = Object.values(layerRefs.current)
-      .map(layer => (layer as any)?.getSource())
-      .filter((src): src is any => src && typeof src.on === "function" && typeof (src as any).getFeatures === "function");
-
-    sources.forEach(src => {
-      src.on("change", triggerRedraw);
-    });
-
-    return () => {
-      sources.forEach(src => {
-        src.un("change", triggerRedraw);
-      });
-    };
+    setAvailableFields([
+      "district_name",
+      "block_name",
+      "station_name",
+      "waterbody_type",
+      "basin_name",
+      "soil_type"
+    ]);
+    setUniqueValues([
+      "Guwahati",
+      "Dibrugarh",
+      "Jorhat",
+      "Silchar",
+      "Tezpur",
+      "Nagaon"
+    ]);
   }, []);
 
   return (
