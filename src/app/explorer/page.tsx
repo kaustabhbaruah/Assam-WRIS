@@ -62,6 +62,18 @@ export default function Explorer() {
   const [isStakeholderOpen, setIsStakeholderOpen] = useState(false);
   const [isInfrastructureOpen, setIsInfrastructureOpen] = useState(false);
 
+  
+  // Sub-dropdown collapse/expand states for Stakeholders list
+  const [openStakeholders, setOpenStakeholders] = useState<{ [key: string]: boolean }>({
+    cgwb: false,
+    amrut: false,
+    pwd: false,
+  });
+
+  const toggleStakeholder = (key: string) => {
+    setOpenStakeholders(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // Compute active map layers with geometry and color mapping to support a dynamic legend state
   const activeLayers = useMemo(() => {
     const layers: { id: string; name: string; color: string; type: string; }[] = [];
@@ -439,17 +451,77 @@ export default function Explorer() {
             </button>
 
             {isStakeholderOpen && (
-              <div className="space-y-1 mt-3 pt-2 animate-in fade-in duration-200">
+                 <div className="space-y-2 mt-3 pt-2 animate-in fade-in duration-200">
+                
+                {/* Stakeholder 1: CGWB */}
+                <div className="border border-blue-100/50 dark:border-slate-800 rounded-xl p-2.5 bg-white/60 dark:bg-slate-900/50">
+                  <button
+                    onClick={() => toggleStakeholder('cgwb')}
+                    className="w-full flex items-center justify-between text-left focus:outline-none select-none group cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary-blue dark:group-hover:text-cyan-400 transition-colors">
+                      Central Ground Water Board (CGWB)
+                    </span>
+                    {openStakeholders.cgwb ? (
+                      <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                    )}
+                  </button>
+                  {openStakeholders.cgwb && (
+                    <div className="space-y-1 mt-2 pt-2 border-t border-gray-100 dark:border-slate-800 pl-1">
                 <SidebarItem 
                   label="CGWB Dug Well" 
                   checked={showCGWBLayer} 
                   onChange={(val: boolean) => setShowCGWBLayer(val)} 
                 />
+              </div>
+                  )}
+                </div>
+
+                {/* Stakeholder 2: AMRUT */}
+                <div className="border border-blue-100/50 dark:border-slate-800 rounded-xl p-2.5 bg-white/60 dark:bg-slate-900/50">
+                  <button
+                    onClick={() => toggleStakeholder('amrut')}
+                    className="w-full flex items-center justify-between text-left focus:outline-none select-none group cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary-blue dark:group-hover:text-cyan-400 transition-colors">
+                      AMRUT / Urban Affairs
+                    </span>
+                    {openStakeholders.amrut ? (
+                      <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                    )}
+                  </button>
+                  {openStakeholders.amrut && (
+                    <div className="space-y-1 mt-2 pt-2 border-t border-gray-100 dark:border-slate-800 pl-1">
                 <SidebarItem 
                   label="AMRUT Water Bodies" 
                   checked={showWaterbodiesAmrut} 
                   onChange={(val: boolean) => setShowWaterbodiesAmrut(val)} 
                 />
+                  </div>
+                  )}
+                </div>
+
+                {/* Stakeholder 3: PWD */}
+                <div className="border border-blue-100/50 dark:border-slate-800 rounded-xl p-2.5 bg-white/60 dark:bg-slate-900/50">
+                  <button
+                    onClick={() => toggleStakeholder('pwd')}
+                    className="w-full flex items-center justify-between text-left focus:outline-none select-none group cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-gray-800 dark:text-slate-200 group-hover:text-primary-blue dark:group-hover:text-cyan-400 transition-colors">
+                      Public Works Department (PWD)
+                    </span>
+                    {openStakeholders.pwd ? (
+                      <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                    )}
+                  </button>
+                  {openStakeholders.pwd && (
+                    <div className="space-y-1 mt-2 pt-2 border-t border-gray-100 dark:border-slate-800 pl-1">
                 <SidebarItem 
                   label="State Highway" 
                   checked={showStateHighway} 
@@ -465,6 +537,10 @@ export default function Explorer() {
                   checked={showBridgePoints} 
                   onChange={(val: boolean) => setShowBridgePoints(val)} 
                 />
+              </div>
+                  )}
+                </div>
+
               </div>
             )}
           </section>

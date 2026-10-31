@@ -31,39 +31,46 @@ export const Navbar = memo(function Navbar() {
 
   return (
     <header className="relative w-full z-50 transition-all duration-300">
-      <div className="flex justify-between items-center w-full px-8 h-20 bg-blue-50/90 dark:bg-slate-950/80 backdrop-blur-md border-b border-blue-100/50 dark:border-slate-800 shadow-sm">
-        <div className="flex items-center gap-12">
-          {/* Brand Terminal */}
-          <Link href="/" className="flex flex-col group max-w-lg">
-            <span className="text-base md:text-lg font-bold tracking-tight text-primary-blue dark:text-cyan-400 group-hover:text-primary-container transition-colors leading-tight">
-              {t("AssamWRIS")}
-            </span>
-            <div className="flex flex-col mt-0.5">
-               <span className="text-[8px] font-bold text-aquatic-teal dark:text-cyan-200 tracking-wider uppercase leading-none opacity-80">
-                 {t("Water Resources Department")}
-               </span>
-               <span className="text-[10px] font-bold text-primary-container dark:text-blue-300 tracking-[0.1em] uppercase leading-tight mt-0.5">
-                 {t("Govt. of Assam")}
-               </span>
-            </div>
+      <div className="flex justify-between items-center w-full px-4 md:px-10 py-3 md:py-0 md:h-36 bg-blue-50/95 dark:bg-slate-950/90 backdrop-blur-md border-b border-blue-100/60 dark:border-slate-800 shadow-md">
+        {/* Left: Government of Assam Logo & Writeup */}
+        <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 group">
+            <img 
+              src="/img/wrd_logo.jpeg" 
+              alt="Government of Assam - Water Resources Department" 
+              className="h-12 sm:h-16 md:h-28 w-auto object-contain transition-transform group-hover:scale-105" 
+              referrerPolicy="no-referrer"
+            />
           </Link>
-          
-          {/* Navigation Grid */}
-          <nav className="hidden xl:flex gap-8 items-center h-full">
+        </div>
+
+        {/* Center: Brand Title & Navigation Links */}
+        <div className="flex flex-col items-center gap-1 md:gap-2.5 flex-1 mx-2">
+          <Link href="/" className="flex flex-col items-center group text-center">
+            <span className="text-xs sm:text-sm md:text-xl lg:text-2xl font-black tracking-tight text-primary-blue dark:text-cyan-400 group-hover:text-primary-container transition-colors leading-tight">
+              {t("Assam Water Resources Information System")}
+            </span>
+            <span className="text-[8px] sm:text-[9px] md:text-xs font-bold text-aquatic-teal dark:text-cyan-200 tracking-[0.1em] sm:tracking-[0.2em] uppercase mt-0.5">
+              {t("Water Resources Department • Government of Assam")}
+            </span>
+          </Link>
+
+          {/* Navigation Links */}
+          <nav className="hidden xl:flex gap-6 items-center">
             {links.map((link) => (
               <Link
                 key={link.path}
                 href={link.path}
                 target={(link as any).target}
                 rel={(link as any).target === "_blank" ? "noopener noreferrer" : undefined}
-                className={`text-xs font-bold uppercase tracking-widest transition-all relative py-1 flex items-center gap-2 group ${
+                className={`text-[11px] font-bold uppercase tracking-widest transition-all relative py-1 flex items-center gap-1.5 group ${
                   pathname === link.path
                     ? "text-primary-blue dark:text-cyan-400 opacity-100"
-                    : "text-gray-400 dark:text-slate-400 hover:text-primary-blue dark:hover:text-cyan-400 opacity-70 hover:opacity-100"
+                    : "text-gray-500 dark:text-slate-400 hover:text-primary-blue dark:hover:text-cyan-400 opacity-80 hover:opacity-100"
                 }`}
               >
                 {pathname === link.path && (
-                  <motion.div layoutId="nav-glow" className="absolute -bottom-2 left-0 right-0 h-1 bg-primary-blue dark:bg-cyan-500 rounded-full" />
+                  <motion.div layoutId="nav-glow" className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary-blue dark:bg-cyan-500 rounded-full" />
                 )}
                 {link.icon && <link.icon className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />}
                 {link.label}
@@ -72,45 +79,57 @@ export const Navbar = memo(function Navbar() {
           </nav>
         </div>
 
-        {/* Control Actions */}
-        <div className="flex items-center gap-4 md:gap-6">
-          {/* Language Switcher - Hide label on tiny screens but keep selector */}
-          <div className="flex items-center bg-white/60 dark:bg-slate-800 border border-blue-100/50 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm backdrop-blur-sm">
-            <button 
-              onClick={() => setLanguage("en")}
-              className={`px-3 py-1.5 text-[10px] font-bold transition-colors ${language === "en" ? "bg-primary-blue text-white" : "text-gray-400 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700"}`}
-            >
-              EN
-            </button>
-            <button 
-              onClick={() => setLanguage("as")}
-              className={`px-3 py-1.5 text-[10px] font-bold transition-colors ${language === "as" ? "bg-primary-blue text-white" : "text-gray-400 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 font-hindi"}`}
-            >
-              AS
-            </button>
+        {/* Right: Hydro Informatics Unit Logo & Controls */}
+        <div className="flex items-center gap-3 md:gap-6">
+          <div className="hidden md:flex items-center">
+            <img 
+              src="/img/hiu_logo.jpeg" 
+              alt="Hydro Informatics Unit - Building Climate Resilience" 
+              className="h-10 sm:h-14 md:h-24 w-auto object-contain transition-transform hover:scale-105" 
+              referrerPolicy="no-referrer"
+            />
           </div>
 
-          {/* Theme Switcher */}
-          <button 
-            onClick={toggleTheme}
-            className="p-2.5 bg-white/60 dark:bg-slate-800 border border-blue-100/50 dark:border-slate-700 rounded-xl hover:bg-white dark:hover:bg-slate-700 transition-all group flex items-center justify-center text-gray-500 dark:text-gray-400 shadow-sm backdrop-blur-sm"
-            title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
-          >
-            {theme === "light" ? (
-              <Moon className="w-5 h-5 group-hover:text-primary-blue transition-colors" />
-            ) : (
-              <Sun className="w-5 h-5 group-hover:text-yellow-500 transition-colors" />
-            )}
-          </button>
+          {/* Control Actions */}
+          <div className="flex items-center gap-3">
+            {/* Language Switcher */}
+            <div className="flex items-center bg-white/80 dark:bg-slate-800 border border-blue-100/60 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm backdrop-blur-sm">
+              <button 
+                onClick={() => setLanguage("en")}
+                className={`px-2.5 py-1.5 text-[10px] font-bold transition-colors ${language === "en" ? "bg-primary-blue text-white" : "text-gray-400 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700"}`}
+              >
+                EN
+              </button>
+              <button 
+                onClick={() => setLanguage("as")}
+                className={`px-2.5 py-1.5 text-[10px] font-bold transition-colors ${language === "as" ? "bg-primary-blue text-white" : "text-gray-400 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 font-hindi"}`}
+              >
+                AS
+              </button>
+            </div>
 
-          {/* Mobile Menu Hamburger (Visible beneath xl) */}
-          <button 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="xl:hidden p-2.5 bg-white/60 dark:bg-slate-800 border border-blue-100/50 dark:border-slate-700 rounded-xl hover:bg-white dark:hover:bg-slate-700 transition-all text-primary-blue dark:text-cyan-400 shadow-sm backdrop-blur-sm"
-            title="Toggle Menu"
-          >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+            {/* Theme Switcher */}
+            <button 
+              onClick={toggleTheme}
+              className="p-2.5 bg-white/80 dark:bg-slate-800 border border-blue-100/60 dark:border-slate-700 rounded-xl hover:bg-white dark:hover:bg-slate-700 transition-all group flex items-center justify-center text-gray-500 dark:text-gray-400 shadow-sm backdrop-blur-sm"
+              title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            >
+              {theme === "light" ? (
+                <Moon className="w-4 h-4 group-hover:text-primary-blue transition-colors" />
+              ) : (
+                <Sun className="w-4 h-4 group-hover:text-yellow-500 transition-colors" />
+              )}
+            </button>
+
+            {/* Mobile Menu Hamburger */}
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="xl:hidden p-2.5 bg-white/80 dark:bg-slate-800 border border-blue-100/60 dark:border-slate-700 rounded-xl hover:bg-white dark:hover:bg-slate-700 transition-all text-primary-blue dark:text-cyan-400 shadow-sm backdrop-blur-sm"
+              title="Toggle Menu"
+            >
+              {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -189,7 +208,13 @@ export const Footer = memo(function Footer() {
         </div>
       </div>
       
-      <div className="max-w-7xl mx-auto border-t border-blue-900 mt-16 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div className="max-w-7xl mx-auto border-t border-blue-900/60 dark:border-slate-800 mt-12 pt-8">
+        <p className="text-xs text-blue-200/40 dark:text-slate-400 leading-relaxed text-center md:text-left">
+          <strong className="text-cyan-400 font-semibold">Disclaimer:</strong> The data, maps, and hydro-meteorological information hosted on AssamWRIS are compiled and managed by the Hydro Informatics Unit, Water Resources Department, Government of Assam for general information and decision-support. While rigorous quality checks are maintained, the Department assumes no legal liability for any operational decisions or outcomes resulting from the use of this portal.
+        </p>
+      </div>
+
+      <div className="max-w-7xl mx-auto border-t border-blue-900 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <p className="text-[10px] font-bold text-blue-300/40 uppercase tracking-widest">
            © {new Date().getFullYear()} WATER RESOURCES DEPARTMENT • GOVT OF ASSAM
         </p>

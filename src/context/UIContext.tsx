@@ -70,7 +70,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       "Water Resources Department": { en: "Water Resources Department", as: "জলসম্পদ বিভাগ" },
       "Govt. of Assam": { en: "Govt. of Assam", as: "অসম চৰকাৰ" },
       "HeroTitle": { en: "Assam-WRIS", as: "অসম জলসম্পদ তথ্য ব্যৱস্থা" },
-      "HeroSubtitle": { en: "An interactive spatial intelligence platform for hydrological monitoring, GIS basin mapping, and water resources decision support in Assam", as: "অসম ৰাজ্যৰ বাবে জলতাত্ত্বিক নিৰীক্ষণ, জিআইএছ অৱবাহিকা মানচিত্ৰকৰণ আৰু জলসম্পদ সিদ্ধান্ত সমৰ্থনৰ এক সংকলিত স্থানিক মঞ্চ।" },
+      "HeroSubtitle": { en: "Empowering the state with data-driven climate resilience and sustainable water resource management through advanced geospatial intelligence and spatial hydrology analytics.", as: "উন্নত ভূ-স্থানীয় বুদ্ধিমত্তা আৰু স্থানীয় জলবিজ্ঞান বিশ্লেষণৰ জৰিয়তে তথ্য-চালিত জলবায়ু স্থিতিস্থাপকতা আৰু বহনক্ষম জলসম্পদ ব্যৱস্থাপনাৰ দ্বাৰা ৰাজ্যক শক্তিশালী কৰা।" },
       "ExploreExplorer": { en: "GIS Explorer", as: "জিআইএছ এক্সপ্ল’ৰাৰ" },
       "ViewDashboard": { en: "Live Telemetry", as: "লাইভ টেলিমেট্ৰি" },
       "DataArchitecture": { en: "DATA ARCHITECTURE", as: "তথ্য স্থাপত্য" },

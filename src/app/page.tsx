@@ -70,9 +70,9 @@ export default function Home() {
             <h1 className="text-5xl font-bold text-primary-blue dark:text-cyan-400 mb-6 leading-tight">
               {t("HeroTitle")}
             </h1>
-            {/* <p className="text-lg text-on-surface-variant dark:text-slate-300 mb-8 max-w-xl">
+            <p className="text-lg text-on-surface-variant dark:text-slate-300 mb-8 max-w-xl">
               {t("HeroSubtitle")}
-            </p> */}
+            </p>
             <div className="flex flex-wrap gap-4">
               <Link
                 href="/explorer"

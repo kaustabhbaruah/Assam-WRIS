@@ -273,3 +273,46 @@ Open your browser inspector (F12) Network tab. Search for `/wms` queries:
 To slash response delays below 50ms:
 - **GridSet alignment:** Map tiles using the standard global grid (`EPSG:900913` / `EPSG:3857`).
 - **GWC Pre-Caching:** Open GeoServer Cache dashboard, select layer, choose "Seed/Truncate", zoom levels 1 to 14, and compute pre-cached coordinates. Subsequent client calls draw directly from pre-rendered GWC memory structures, completely bypassing slow dynamic SQL lookups.
+
+---
+
+## 🏛️ Managing Stakeholder Layers: Add, Update, and Delete Procedures
+
+The portal features a **Nested Stakeholder Data Architecture** in the GIS Toolbox sidebar (`/src/app/explorer/page.tsx`), where layers are categorized under individual stakeholder organizations (e.g., Central Ground Water Board - CGWB, AMRUT / Urban Affairs, Public Works Department - PWD).
+
+### 1. How to ADD a New Stakeholder Layer
+To introduce a new layer provided by an existing or new stakeholder:
+1. **Upload & Publish on GeoServer:** Follow the standard GeoServer publishing guide above to load your PostGIS table into the `assam` workspace and associate an SLD style.
+2. **Register Metadata in Constants (`/src/constants/layers.ts`):**
+   Add your new layer object with `category: "Stakeholder Data"` and document the source/stakeholder organization.
+3. **Configure the Nested Sidebar UI (`/src/app/explorer/page.tsx`):**
+   - Declare a visibility state hook in `Explorer`:
+     ```typescript
+     const [showNewStakeholderLayer, setShowNewStakeholderLayer] = useState(false);
+     ```
+   - Include the layer inside the `activeLayers` useMemo hook.
+   - Locate the target stakeholder accordion inside the **Stakeholder's Data** section (or add a new stakeholder accordion block) and add the `SidebarItem`:
+     ```tsx
+     <SidebarItem 
+       label="New Layer Name" 
+       checked={showNewStakeholderLayer} 
+       onChange={(val: boolean) => setShowNewStakeholderLayer(val)} 
+     />
+     ```
+4. **Map Component Integration (`/src/components/MapComponent.tsx`):**
+   - Pass `isNewStakeholderLayerVisible` prop to `MapComponent`.
+   - Register the layer reference and sync rule using `syncMapLayer("new_layer_id", isNewStakeholderLayerVisible, "wms")`.
+
+### 2. How to UPDATE an Existing Stakeholder Layer
+- **To update geospatial geometries/attributes:** Modify or reload the PostGIS table on the database server. GeoServer will instantly reflect the updated features without frontend code changes.
+- **To update layer symbology/styling:** Update the SLD XML file on GeoServer, assign it to the layer, and clear the GeoWebCache tile cache.
+- **To rename or reassign a stakeholder:** 
+  1. Update the `name` or grouping inside `/src/constants/layers.ts`.
+  2. Update the label in the nested sidebar accordion inside `/src/app/explorer/page.tsx`.
+
+### 3. How to DELETE a Stakeholder Layer
+To permanently remove a stakeholder layer from the system:
+1. **Remove from Explorer Sidebar (`/src/app/explorer/page.tsx`):** Delete the corresponding `SidebarItem` component call from the stakeholder's nested accordion block, remove its visibility state hook, and remove it from the `activeLayers` useMemo calculation.
+2. **Remove from Map Component (`/src/components/MapComponent.tsx`):** Remove the visibility prop, layer reference, and `syncMapLayer` invocation.
+3. **Remove from Layer Constants (`/src/constants/layers.ts`):** Delete the layer entry object from `GEOSERVER_LAYERS`.
+4. **Unpublish on GeoServer:** Access GeoServer, navigate to Layers, select the layer, click **Remove Layer**, and optionally drop the associated table from PostgreSQL/PostGIS if no longer required.
